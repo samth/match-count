@@ -5,9 +5,13 @@
 (provide match/count match*/count)
 
 (define-syntax (match/count stx)
+  (define-syntax-class cl
+    (pattern [pat body ... body0]
+             #:with p* (syntax/loc #'pat (pat))
+             #:with e #'[p* body ... body0]))
   (syntax-parse stx
-    [(_ arg [pat body ... body0] ...)
-     #'(match*/count (arg) [(pat) body ... body0] ...)]))
+    [(_ arg c:cl ...)
+     #'(match*/count (arg) c.e ...)]))
 
 (define-syntax (match*/count stx)
   (syntax-parse stx
@@ -16,7 +20,17 @@
      (syntax-local-lift-expression
       #`(exit-handler 
          (let ([ex (exit-handler)])
-           (lambda (n) (pretty-print (sort #:key cdr (hash->list #,x) >)) (ex n)))))
+           (lambda (n)
+             (pretty-print (sort #:key cdr (hash->list #,x) >))
+             (flush-output)
+             (ex n)))))
+     (syntax-local-lift-expression
+      #`(executable-yield-handler 
+         (let ([ex (executable-yield-handler)])
+           (lambda (n)
+             (pretty-print (sort #:key cdr (hash->list #,x) >))
+             (flush-output)
+             (ex n)))))
      (with-syntax ([(k ...) (for/list ([p (syntax->list #'(pat ...))])
                               (syntax-line p))])
        #`(match* args
